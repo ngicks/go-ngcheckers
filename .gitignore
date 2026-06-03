@@ -30,3 +30,22 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# APM dependencies
+apm_modules/
+
+/.agents
+/.claude
+/.codex
+/.github/instructions
+/.github/skills
+
+/bin
+/cmdman
+/muxctltester
+
+/CLAUDE_*.md
+/CODEX_*.md
+
+CLAUDE.md
+AGENTS.md
