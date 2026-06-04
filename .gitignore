@@ -31,6 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
+/ngcheckers
+
 # APM dependencies
 apm_modules/
 

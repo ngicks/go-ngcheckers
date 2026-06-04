@@ -1,0 +1,50 @@
+// Package a exercises the noomitempty analyzer on a module targeting Go 1.24,
+// where "omitzero" is available and "omitempty" should be reported.
+package a
+
+import "encoding/json"
+
+// Flagged reports the basic cases.
+type Flagged struct {
+	Name    string `json:"name,omitzero"`             // want `use "omitzero"`
+	NoName  string `json:",omitzero"`                 // want `use "omitzero"`
+	WithOpt string `json:"with_opt,omitzero,string"`  // want `use "omitzero"`
+	Nested  struct {
+		Inner int `json:"inner,omitzero"` // want `use "omitzero"`
+	}
+}
+
+// Exempt covers cases that must NOT be reported.
+type Exempt struct {
+	// json.RawMessage is exempt: its zero value is a nil slice.
+	Raw    json.RawMessage  `json:"raw,omitempty"`
+	RawPtr *json.RawMessage `json:"raw_ptr,omitempty"`
+
+	// No "omitempty" option present.
+	Plain string `json:"plain"`
+	Dash  string `json:"-"`
+
+	// "omitempty" only in a non-json tag is irrelevant.
+	Other string `yaml:"other,omitempty" json:"other"`
+
+	// A field literally named "omitempty" is not the option.
+	Literal string `json:"omitempty"`
+
+	// No struct tag at all.
+	Untagged string
+}
+
+// Embedded checks tags on embedded fields and anonymous nested structs.
+type Embedded struct {
+	Flagged `json:"flagged,omitzero"` // want `use "omitzero"`
+	Group   struct {
+		Deep string `json:"deep,omitzero"` // want `use "omitzero"`
+	} `json:"group"`
+}
+
+// InterpretedTag uses a double-quoted (interpreted) string literal for the tag
+// instead of the conventional raw string (backticks). It is semantically the
+// same struct tag, so "omitempty" is reported here too.
+type InterpretedTag struct {
+	F string "json:\"f,omitzero\"" // want `use "omitzero"`
+}
