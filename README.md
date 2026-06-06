@@ -1,23 +1,19 @@
 # go-ngcheckers
 
-A bundle of [`go/analysis`][analysis] checkers by ngicks, exposed through a
-single driver, `ngcheckers`, that runs both standalone and as a `go vet` tool.
+A bundle of [`go/analysis`][analysis] checkers.
 
-```
-.
-├── cmd
-│   └── ngcheckers      # single entry point (multichecker driver)
-└── rules
-    └── noomitempty     # one checker per package
-```
+See [./rules](./rules/) for list of rules
 
 ## Checkers
 
-| Name          | Description |
-|---------------|-------------|
-| `noomitempty` | Forbids the `omitempty` option in `json` struct tags and suggests `omitzero` (Go 1.24+). No-op for modules targeting Go 1.23 or earlier. `json.RawMessage` fields are exempt. Ships an autofix. |
-
 Run `ngcheckers help <name>` for a checker's full documentation and flags.
+
+- `noomitempty`:
+  - Forbids the `json:",omitempty"` option in `json` struct tags
+  - autofixes / suggests `omitzero` (Go 1.24+).
+  - No-op for
+    - Go 1.23 or earlier.
+    - `json.RawMessage` fields.
 
 ## Install
 
@@ -62,6 +58,27 @@ go vet -vettool=$(which ngcheckers) -noomitempty ./...    # only noomitempty
 
 (Use an absolute path to the binary; `$(which ngcheckers)` resolves it from
 `$GOPATH/bin` after `go install`.)
+
+### Suppressing a finding
+
+Suppression is built into the checkers, so it works in **every** mode — the
+standalone driver, `go vet -vettool`, and editor/hook integrations — not only
+under nolint-aware runners. Annotate the offending field with an `//ngignore`
+directive, written either as a trailing comment or on the line directly above
+the field:
+
+```go
+type T struct {
+	A string `json:"a,omitempty"` //ngignore:noomitempty zero value is meaningful here
+	//ngignore:noomitempty,otherchecker reason text is free-form
+	B string `json:"b,omitempty"`
+}
+```
+
+The form is `//ngignore:<name>[,<name>...] [reason]`: the comma-separated list
+names the checkers to silence on that field, and any trailing text is a
+human-readable reason. (golangci-lint's own `//nolint:noomitempty` also
+suppresses the diagnostic, but only when you run under golangci-lint.)
 
 ## Adding a checker
 
