@@ -15,9 +15,17 @@
 // which "omitempty" and "omitzero" behave identically, and "omitempty" is the
 // established spelling for it.
 //
-// To silence a deliberate use of "omitempty", add a `//nolint:noomitempty`
-// directive, which nolint-aware runners (such as golangci-lint) honor. The
-// standalone driver and `go vet` have no suppression mechanism of their own.
+// To silence a deliberate use of "omitempty", annotate the field with an
+// `//ngignore:noomitempty` directive, written either on the line directly
+// above the field or as a trailing comment on the field's own line:
+//
+//	T time.Time `json:"t,omitempty"` //ngignore:noomitempty zero is intentional
+//
+// The directive form is `//ngignore:<name>[,<name>...] [reason]`. The analyzer
+// honors it itself, so suppression works under every run mode — the standalone
+// driver, `go vet -vettool`, and editor/hook integrations — not only under
+// nolint-aware runners. (golangci-lint's own `//nolint:noomitempty` also
+// suppresses the diagnostic, but only when run under golangci-lint.)
 package noomitempty
 
 import (
@@ -29,6 +37,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ngicks/go-ngcheckers/internal/directive"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
@@ -42,7 +51,9 @@ preferable to "omitempty". This analyzer reports json struct tags that use
 "omitempty" and suggests replacing it with "omitzero".
 
 The analyzer is a no-op for modules targeting Go 1.23 or earlier. json.RawMessage
-fields are exempt. Use //nolint:noomitempty to allow a deliberate "omitempty".`
+fields are exempt. To allow a deliberate "omitempty", annotate the field with
+//ngignore:noomitempty <reason> (on the field's line or the line above it). This
+directive is honored directly, so it works under go vet and the standalone driver.`
 
 // Analyzer is the noomitempty analyzer.
 var Analyzer = &analysis.Analyzer{
@@ -134,7 +145,7 @@ func normalizeVersion(v string) string {
 // message is the diagnostic text shared by the fix and no-fix report paths.
 const message = `avoid "omitempty" in json struct tags; ` +
 	`use "omitzero" (Go 1.24+) instead, ` +
-	`or add //nolint:noomitempty if "omitempty" is intended here`
+	`or add //ngignore:noomitempty <reason> if "omitempty" is intended here`
 
 func checkField(pass *analysis.Pass, field *ast.Field) {
 	if field.Tag == nil {
@@ -157,6 +168,9 @@ func checkField(pass *analysis.Pass, field *ast.Field) {
 		return
 	}
 	if isRawMessage(pass, field.Type) {
+		return
+	}
+	if directive.Suppresses(pass.Analyzer.Name, field.Doc, field.Comment) {
 		return
 	}
 

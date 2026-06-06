@@ -16,6 +16,12 @@ linters:
     - copyloopvar
     - gocritic
     - lll
+  exclusions:
+    paths:
+      # Analyzer fixtures under testdata/ intentionally contain "wrong" code
+      # (e.g. omitempty on struct fields). They are validated by analysistest,
+      # not golangci-lint, so keep golangci-lint from reporting on them.
+      - (^|/)testdata(/|$)
   settings:
     govet:
       # Mirror the gopls analyses turned on in

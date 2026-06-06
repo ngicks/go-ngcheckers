@@ -48,3 +48,24 @@ type Embedded struct {
 type InterpretedTag struct {
 	F string "json:\"f,omitempty\"" // want `use "omitzero"`
 }
+
+// Suppressed covers fields whose deliberate "omitempty" is retained via an
+// //ngignore directive; none of these may be reported, and -fix must leave
+// their tags untouched.
+type Suppressed struct {
+	// Trailing directive on the field's own line.
+	Trailing string `json:"trailing,omitempty"` //ngignore:noomitempty empty is meaningful
+
+	//ngignore:noomitempty empty is meaningful
+	Lead string `json:"lead,omitempty"`
+
+	// A comma-separated list that names this checker among others suppresses too.
+	Multi string `json:"multi,omitempty"` //ngignore:othercheck,noomitempty intentional
+
+	// A directive with no trailing reason still suppresses.
+	NoReason string `json:"no_reason,omitempty"` //ngignore:noomitempty
+
+	// A directive naming only a different checker does NOT suppress this one.
+	//ngignore:othercheck unrelated
+	StillFlagged string `json:"still_flagged,omitempty"` // want `use "omitzero"`
+}
