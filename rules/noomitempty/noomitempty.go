@@ -9,7 +9,9 @@
 // "omitempty" and suggests "omitzero" instead.
 //
 // The analyzer does nothing when the analyzed module targets Go 1.23 or
-// lower, because "omitzero" is not available there.
+// lower, because "omitzero" is not available there. It also skips files that
+// carry the conventional generated-code marker (see go/ast.IsGenerated), since
+// those are not edited by hand.
 //
 // A `json.RawMessage` field is exempt: its zero value is a nil slice, for
 // which "omitempty" and "omitzero" behave identically, and "omitempty" is the
@@ -38,6 +40,7 @@ import (
 	"strings"
 
 	"github.com/ngicks/go-ngcheckers/internal/directive"
+	"github.com/ngicks/go-ngcheckers/internal/generated"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
@@ -50,10 +53,12 @@ Since Go 1.24 the "omitzero" json tag option is available and is almost always
 preferable to "omitempty". This analyzer reports json struct tags that use
 "omitempty" and suggests replacing it with "omitzero".
 
-The analyzer is a no-op for modules targeting Go 1.23 or earlier. json.RawMessage
-fields are exempt. To allow a deliberate "omitempty", annotate the field with
-//ngignore:noomitempty <reason> (on the field's line or the line above it). This
-directive is honored directly, so it works under go vet and the standalone driver.`
+The analyzer is a no-op for modules targeting Go 1.23 or earlier, and it skips
+generated files (those with a "// Code generated ... DO NOT EDIT." marker).
+json.RawMessage fields are exempt. To allow a deliberate "omitempty", annotate
+the field with //ngignore:noomitempty <reason> (on the field's line or the line
+above it). This directive is honored directly, so it works under go vet and the
+standalone driver.`
 
 // Analyzer is the noomitempty analyzer.
 var Analyzer = &analysis.Analyzer{
@@ -80,8 +85,16 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 
+	// Generated files (e.g. //go:generate output) are not edited by hand, so
+	// reporting "omitempty" in them only adds noise. Skip nodes that live in
+	// one.
+	gen := generated.Collect(pass.Fset, pass.Files)
+
 	insp.Preorder([]ast.Node{(*ast.StructType)(nil)}, func(n ast.Node) {
 		st := n.(*ast.StructType)
+		if gen.Contains(st.Pos()) {
+			return
+		}
 		if st.Fields == nil {
 			return
 		}
