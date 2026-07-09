@@ -14,6 +14,18 @@ Run `ngcheckers help <name>` for a checker's full documentation and flags.
   - No-op for
     - Go 1.23 or earlier.
     - `json.RawMessage` fields.
+- `noosisfuncs`:
+  - Forbids the legacy os error predicates `os.IsExist`, `os.IsNotExist`,
+    `os.IsPermission` and `os.IsTimeout`, which do not unwrap `%w`-wrapped
+    errors
+  - autofixes / suggests `errors.Is(err, fs.ErrNotExist)` etc., adding the
+    `errors` and `io/fs` imports when needed. `os.IsTimeout` is reported
+    without a fix (the right sentinel — e.g. `os.ErrDeadlineExceeded` —
+    depends on the call).
+  - No-op for
+    - Go 1.15 or earlier (the `io/fs` sentinels need Go 1.16); except
+      `os.IsTimeout`, which is reported from Go 1.15 on
+      (`os.ErrDeadlineExceeded`).
 
 ## Install
 

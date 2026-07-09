@@ -14,6 +14,7 @@ package directive
 
 import (
 	"go/ast"
+	"go/token"
 	"slices"
 	"strings"
 )
@@ -56,6 +57,34 @@ func ParseIgnore(comment string) (ig Ignore, ok bool) {
 // Names reports whether the directive lists rule among its rule names.
 func (ig Ignore) Names(rule string) bool {
 	return slices.Contains(ig.Rules, rule)
+}
+
+// SuppressesLine reports whether an //ngignore directive naming rule appears
+// on the same line as pos or on the line directly above it, anywhere in file's
+// comments. It serves nodes the parser attaches no comments to (expressions,
+// statements), where [Suppresses] cannot be used: the directive is written
+// either trailing the offending line or on its own line right above it. pos
+// must belong to file and fset must be the FileSet file was parsed with;
+// otherwise the result is false.
+func SuppressesLine(fset *token.FileSet, file *ast.File, rule string, pos token.Pos) bool {
+	tf := fset.File(pos)
+	if tf == nil || file == nil {
+		return false
+	}
+	line := tf.Line(pos)
+	for _, g := range file.Comments {
+		for _, c := range g.List {
+			// Comments of file resolve within the same *token.File as pos.
+			cl := tf.Line(c.Pos())
+			if cl != line && cl != line-1 {
+				continue
+			}
+			if ig, ok := ParseIgnore(c.Text); ok && ig.Names(rule) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Suppresses reports whether any //ngignore directive among the given comment

@@ -19,10 +19,12 @@ import (
 	"golang.org/x/tools/go/analysis/multichecker"
 
 	"github.com/ngicks/go-ngcheckers/rules/noomitempty"
+	"github.com/ngicks/go-ngcheckers/rules/noosisfuncs"
 )
 
 func main() {
 	multichecker.Main(
 		noomitempty.Analyzer,
+		noosisfuncs.Analyzer,
 	)
 }

@@ -34,13 +34,12 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	goversion "go/version"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/ngicks/go-ngcheckers/internal/directive"
 	"github.com/ngicks/go-ngcheckers/internal/generated"
+	"github.com/ngicks/go-ngcheckers/internal/gover"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
@@ -74,7 +73,7 @@ var Analyzer = &analysis.Analyzer{
 const minVersion = "go1.24"
 
 func run(pass *analysis.Pass) (any, error) {
-	if !supportsOmitzero(pass) {
+	if !gover.AtLeast(pass, minVersion) {
 		// Module targets Go 1.23 or lower: "omitzero" is unavailable, so
 		// there is nothing to recommend. Do nothing and return.
 		return nil, nil
@@ -104,55 +103,6 @@ func run(pass *analysis.Pass) (any, error) {
 	})
 
 	return nil, nil
-}
-
-// supportsOmitzero reports whether the analyzed package targets a Go version
-// that understands the "omitzero" json tag option (Go 1.24+). When the version
-// cannot be determined the analyzer errs toward running: modern toolchains are
-// well past 1.24, and real builds (go vet, go/packages) always supply module
-// metadata.
-func supportsOmitzero(pass *analysis.Pass) bool {
-	v := effectiveGoVersion(pass)
-	if v == "" {
-		return true
-	}
-	return goversion.Compare(v, minVersion) >= 0
-}
-
-// effectiveGoVersion returns the Go language version targeted by the analyzed
-// package as a canonical "go1.N" string, or "" when it is unknown. The
-// type-checker's version (derived from the module's go directive) is the most
-// reliable source and is available under every loader; the module metadata is
-// a fallback.
-func effectiveGoVersion(pass *analysis.Pass) string {
-	if pass.Pkg != nil {
-		if v := normalizeVersion(pass.Pkg.GoVersion()); v != "" {
-			return v
-		}
-	}
-	if pass.Module != nil {
-		if v := normalizeVersion(pass.Module.GoVersion); v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-// normalizeVersion canonicalizes a Go version string to the "go1.N" form
-// expected by go/version, returning "" when the input is empty or invalid.
-// It accepts both "1.24" (go.mod go directive form) and "go1.24" (go/types
-// form).
-func normalizeVersion(v string) string {
-	if v == "" {
-		return ""
-	}
-	if !strings.HasPrefix(v, "go") {
-		v = "go" + v
-	}
-	if !goversion.IsValid(v) {
-		return ""
-	}
-	return v
 }
 
 // message is the diagnostic text shared by the fix and no-fix report paths.

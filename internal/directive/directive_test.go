@@ -2,6 +2,8 @@ package directive_test
 
 import (
 	"go/ast"
+	"go/parser"
+	"go/token"
 	"slices"
 	"testing"
 
@@ -143,5 +145,69 @@ func TestSuppresses(t *testing.T) {
 				t.Errorf("Suppresses(%q, ...) = %v, want %v", tt.rule, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSuppressesLine(t *testing.T) {
+	const src = `package p
+
+import "os"
+
+func f(err error) {
+	_ = os.IsNotExist(err) //ngignore:noosisfuncs trailing directive
+
+	//ngignore:noosisfuncs lead directive
+	_ = os.IsNotExist(err)
+
+	//ngignore:othercheck names another rule
+	_ = os.IsNotExist(err)
+
+	//ngignore:noosisfuncs two lines above, too far
+	// filler
+	_ = os.IsNotExist(err)
+}
+`
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "p.go", src, parser.ParseComments)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Collect the os.IsNotExist call positions in source order.
+	var calls []token.Pos
+	ast.Inspect(file, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			calls = append(calls, call.Pos())
+		}
+		return true
+	})
+	if len(calls) != 4 {
+		t.Fatalf("found %d calls, want 4", len(calls))
+	}
+
+	wants := []struct {
+		name string
+		want bool
+	}{
+		{name: "trailing directive on the same line", want: true},
+		{name: "directive on the line directly above", want: true},
+		{name: "directive naming another rule", want: false},
+		{name: "directive two lines above", want: false},
+	}
+	for i, tt := range wants {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := directive.SuppressesLine(
+				fset,
+				file,
+				"noosisfuncs",
+				calls[i],
+			); got != tt.want {
+				t.Errorf("SuppressesLine(call %d) = %v, want %v", i, got, tt.want)
+			}
+		})
+	}
+
+	if directive.SuppressesLine(token.NewFileSet(), file, "noosisfuncs", calls[0]) {
+		t.Error("SuppressesLine with a foreign FileSet = true, want false")
 	}
 }
